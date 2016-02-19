@@ -16,7 +16,7 @@ var Engine = {
   },
 
   start: function() {
-    Engine.changeState(States.PlayState);
+    Engine.changeState(PlayState);
     Engine.main();
   },
 
@@ -51,7 +51,7 @@ var Engine = {
       Engine.state.end();
     }
 
-    newState.init();
+    newState.init(Engine);
     newState.start();
     Engine.state = newState;
   },

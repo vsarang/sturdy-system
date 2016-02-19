@@ -6,8 +6,8 @@ var World = {
   grid: [],
 
   init: function() {
-    for (var i = 0; i < 200; i++) {
-      World.minions.push(new Minion(new Vector2(100, 100)));
+    for (var i = 0; i < 100; i++) {
+      World.minions.push(new Minion(new Vector2(i * 20, 100)));
     }
 
     for (var i = 0; i < World.dim.x; i++) {

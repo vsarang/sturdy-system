@@ -1,26 +1,10 @@
-function GameState(attrs) {
-  if (!attrs.hasOwnProperty('end')
-      || !attrs.hasOwnProperty('handleKeyboardInput')
-      || !attrs.hasOwnProperty('init')
-      || !attrs.hasOwnProperty('start')
-      || !attrs.hasOwnProperty('update')
-      || !attrs.hasOwnProperty('render')
-      || !attrs.hasOwnProperty('onMouseDown')
-      || !attrs.hasOwnProperty('onMouseUp')
-      || !attrs.hasOwnProperty('onMouseMove')) {
-    throw "Missing attributes";
-  }
-
-  for (attr in attrs) {
-    this[attr] = attrs[attr];
-  }
-}
-
 var PlayState = new GameState({
   init: function(engine) {
     PlayState.cameraPos = new Vector2(0, 0);
     PlayState.prevDragPos = undefined;
     PlayState.selectedMinions = [];
+    PlayState.collisionTree =
+      new CollisionTree(new Vector2(0, 0), engine.world.dim.times(Constants.TILE_SIZE), 5, 50);
   },
 
   start: function() {
@@ -35,37 +19,53 @@ var PlayState = new GameState({
     PlayState.updateWorld(engine.world, dt);
   },
 
-  updateWorld: function(world, dt) {
+  updateCollisionTree: function(world) {
+    var tree = PlayState.collisionTree;
+    tree.removeLayer();
     world.minions.forEach(function(minion) {
-      // move entity towards destination
+      tree.addObject(minion);
+    });
+  },
+
+  updateWorld: function(world, dt) {
+    PlayState.updateCollisionTree(world);
+    PlayState.moveMinions(world, dt);
+    PlayState.respondToCollisions(world);
+  },
+
+  moveMinions: function(world, dt) {
+    world.minions.forEach(function(minion) {
       if (minion.curTask < minion.tasks.length) {
         var taskPath = minion.tasks[minion.curTask].dest.minus(minion.pos);
         var taskDistance = taskPath.magnitude();
-        if (minion.range < taskDistance) {
-          minion.pos.add(taskPath.dividedBy(taskDistance).times(minion.velocity).times(dt));
-        } else {
+        var minionPath = taskPath.normalize().times(minion.velocity * dt);
+        minion.pos.add(minionPath);
+        if (taskDistance <= minion.range) {
           minion.curTask += 1;
         }
       }
+    });
+  },
 
-      // correct path for collisions
-      var pathCorrection = new Vector2(0, 0);
+  respondToCollisions: function(world) {
+    world.minions.forEach(function(minion) {
+      var collidableObjects = PlayState.collisionTree.getObjects(minion);
+      var correction = new Vector2(0, 0);
       var collisions = 0;
-      world.minions.forEach(function(other) {
-        if (minion === other) return;
-        var difference = minion.pos.minus(other.pos);
-        var magSquare = difference.magSquare();
-        if (magSquare === 0) {
-          difference = new Vector2(Math.random(), Math.random());
-        }
-        var minSeparation = (minion.radius + other.radius) * 2;
-        if (magSquare < (minSeparation * minSeparation)) {
-          pathCorrection.add(difference.normalize().times(minSeparation));
+      collidableObjects.forEach(function(object) {
+        if (object === minion) return;
+        var diff = minion.pos.minus(object.pos);
+        var dist = diff.magnitude();
+        var min = minion.radius + object.radius;
+        if (dist < min) {
+          correction.add(diff.normalize().times(min - dist));
           collisions += 1;
         }
       });
+
       if (collisions) {
-        minion.pos.add(pathCorrection.times(dt));
+        correction = correction.times(1 / collisions);
+        minion.pos.add(correction);
       }
     });
   },
@@ -101,14 +101,13 @@ var PlayState = new GameState({
 
   renderMinions: function(world) {
     PlayState.selectedMinions.forEach(function(minion) {
-      View.renderCircle(minion.pos.minus(PlayState.cameraPos),
-        minion.radius * 1.5, '#aaaaaa');
+      View.renderCircle(minion.pos.plus(minion.dim.times(1/2)).minus(PlayState.cameraPos),
+        Math.max(minion.dim.x, minion.dim.y) * 1.5, '#aaaaaa');
     });
 
     world.minions.forEach(function(minion) {
       AssetFactory.loadSprite('../images/minion.png', function(sprite) {
-        View.renderSprite(sprite, minion.pos.minus(PlayState.cameraPos)
-          .minus(new Vector2(minion.radius, minion.radius)));
+        View.renderSprite(sprite, minion.pos.minus(PlayState.cameraPos));
       });
     });
   },
@@ -235,7 +234,3 @@ var PlayState = new GameState({
     return worldPos.minus(PlayState.cameraPos);
   }
 });
-
-var States = {
-  PlayState: PlayState
-};
