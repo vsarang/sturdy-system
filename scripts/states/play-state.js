@@ -90,7 +90,7 @@ var PlayState = new GameState({
 
     for (var i = gridBounds[0].x; i < gridBounds[1].x; i++) {
       for (var j = gridBounds[0].y; j < gridBounds[1].y; j++) {
-        AssetFactory.loadSprite('../images/grass_tiles.png', function(tile) {
+        AssetFactory.loadSprite('images/grass_tiles.png', function(tile) {
           var tileDim = new Vector2(Constants.TILE_SIZE, Constants.TILE_SIZE);
           var pos = new Vector2(tileDim.x * i, tileDim.y * j);
           View.renderSprite(tile, PlayState.getViewOffset(pos), tileDim, world.grid[i][j].version);
@@ -106,7 +106,7 @@ var PlayState = new GameState({
     });
 
     world.minions.forEach(function(minion) {
-      AssetFactory.loadSprite('../images/minion.png', function(sprite) {
+      AssetFactory.loadSprite('images/minion.png', function(sprite) {
         View.renderSprite(sprite, minion.pos.minus(PlayState.cameraPos));
       });
     });
