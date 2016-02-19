@@ -6,8 +6,9 @@ requestAnimationFrame = window.requestAnimationFrame ||
 var Engine = {
   lastTick: undefined,
 
-  init: function(world) {
+  init: function(world, view) {
     Engine.world = world;
+    Engine.view = view;
 
     Engine.world.init();
     View.init(window.innerWidth, window.innerHeight);

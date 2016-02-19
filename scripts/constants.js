@@ -1,4 +1,4 @@
 var Constants = {
-  TILE_SIZE: 64,
+  TILE_DIM: new Vector2(64, 32),
   GRASS_TILE: 1
 }

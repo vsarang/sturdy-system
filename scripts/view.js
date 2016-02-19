@@ -1,12 +1,10 @@
 var View = {
-  canvas: undefined,
-  context: undefined,
-
   init: function(width, height) {
     View.canvas = document.createElement('canvas');
     View.canvas.width = width;
     View.canvas.height = height;
     View.context = View.canvas.getContext('2d');
+    View.dim = new Vector2(width, height);
 
     document.body.appendChild(View.canvas);
   },
@@ -45,5 +43,6 @@ var View = {
   resizeCanvas: function(width, height) {
     View.canvas.width = width;
     View.canvas.height = height;
+    View.dim = new Vector2(width, height);
   }
 };

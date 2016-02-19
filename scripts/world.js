@@ -7,7 +7,7 @@ var World = {
 
   init: function() {
     for (var i = 0; i < 100; i++) {
-      World.minions.push(new Minion(new Vector2(i * 20, 100)));
+      World.minions.push(new Minion(new Vector2(i, i)));
     }
 
     for (var i = 0; i < World.dim.x; i++) {

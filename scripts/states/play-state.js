@@ -28,9 +28,9 @@ var PlayState = new GameState({
   },
 
   updateWorld: function(world, dt) {
-    PlayState.updateCollisionTree(world);
-    PlayState.moveMinions(world, dt);
-    PlayState.respondToCollisions(world);
+    //PlayState.updateCollisionTree(world);
+    //PlayState.moveMinions(world, dt);
+    //PlayState.respondToCollisions(world);
   },
 
   moveMinions: function(world, dt) {
@@ -71,29 +71,29 @@ var PlayState = new GameState({
   },
 
   render: function(engine) {
-    PlayState.renderWorld(engine.world);
-    PlayState.renderMinions(engine.world);
-    PlayState.renderOverlay(engine.world);
+    PlayState.renderWorld(engine);
+    //PlayState.renderMinions(engine);
+    //PlayState.renderOverlay(engine);
   },
 
-  renderWorld: function(world) {
+  renderWorld: function(engine) {
+    var xMin = PlayState.getGridPos(new Vector2(0, 0)).x;
+    var xMax = PlayState.getGridPos(new Vector2(engine.view.dim)).x + 1;
+    var yMin = PlayState.getGridPos(new Vector2(engine.view.dim.x, 0)).y;
+    var yMax = PlayState.getGridPos(new Vector2(0, engine.view.dim.y)).y + 1;
+
+    var worldDim = engine.world.dim;
     var gridBounds = [
-      new Vector2(
-        Math.max(0, Math.floor(PlayState.cameraPos.x / Constants.TILE_SIZE)),
-        Math.max(0, Math.floor(PlayState.cameraPos.y / Constants.TILE_SIZE))),
-      new Vector2(
-        Math.min(world.dim.x,
-          Math.ceil((PlayState.cameraPos.x + View.canvas.width) / Constants.TILE_SIZE)),
-        Math.min(world.dim.y,
-          Math.ceil((PlayState.cameraPos.y + View.canvas.height) / Constants.TILE_SIZE)))
+      new Vector2(Math.max(0, xMin), Math.max(0, yMin)),
+      new Vector2(Math.min(worldDim.x - 1, xMax), Math.min(worldDim.y - 1, yMax))
     ];
 
-    for (var i = gridBounds[0].x; i < gridBounds[1].x; i++) {
-      for (var j = gridBounds[0].y; j < gridBounds[1].y; j++) {
-        AssetFactory.loadSprite('images/grass_tiles.png', function(tile) {
-          var tileDim = new Vector2(Constants.TILE_SIZE, Constants.TILE_SIZE);
-          var pos = new Vector2(tileDim.x * i, tileDim.y * j);
-          View.renderSprite(tile, PlayState.getViewOffset(pos), tileDim, world.grid[i][j].version);
+    for (var j = gridBounds[0].y; j < gridBounds[1].y; j++) {
+      for (var i = gridBounds[0].x; i < gridBounds[1].x; i++) {
+        AssetFactory.loadSprite('images/plains_tiles.png', function(tile) {
+          var gridPos = new Vector2(i, j);
+          engine.view.renderSprite(tile, PlayState.getViewOffset(gridPos),
+              Constants.TILE_DIM, engine.world.grid[i][j].version);
         });
       }
     }
@@ -143,7 +143,7 @@ var PlayState = new GameState({
     switch (message.button) {
       case 0:
         // select units
-        PlayState.selectUnitsInBoundingRect(engine.world);
+        //PlayState.selectUnitsInBoundingRect(engine.world);
         break;
       case 1:
         // stop dragging camera
@@ -162,29 +162,11 @@ var PlayState = new GameState({
         break;
       case 1:
         if (PlayState.prevDragPos) {
-          PlayState.moveCamera(engine.world, message.offset.minus(PlayState.prevDragPos));
+          PlayState.cameraPos.subtract(message.offset.minus(PlayState.prevDragPos));
           PlayState.prevDragPos = message.offset;
         }
         break;
       default:
-    }
-  },
-
-  moveCamera: function(world, vector) {
-    PlayState.cameraPos.subtract(vector);
-    var worldDim = world.dim.times(Constants.TILE_SIZE);
-
-    if (worldDim.x < (PlayState.cameraPos.x + View.canvas.width)) {
-      PlayState.cameraPos.x = worldDim.x - View.canvas.width;
-    }
-    if (worldDim.y < (PlayState.cameraPos.y + View.canvas.height)) {
-      PlayState.cameraPos.y = worldDim.y - View.canvas.height;
-    }
-    if (PlayState.cameraPos.x < 0) {
-      PlayState.cameraPos.x = 0;
-    }
-    if (PlayState.cameraPos.y < 0) {
-      PlayState.cameraPos.y = 0;
     }
   },
 
@@ -226,11 +208,18 @@ var PlayState = new GameState({
     PlayState.boundingRect.destroy();
   },
 
-  getWorldPos: function(viewPos) {
-    return viewPos.plus(PlayState.cameraPos);
+  getGridPos: function(offset) {
+    offset = offset.plus(PlayState.cameraPos);
+    var gridPos = new Vector2();
+    gridPos.x = Math.floor(offset.x / Constants.TILE_DIM.x + offset.y / Constants.TILE_DIM.y);
+    gridPos.y = Math.floor(offset.y / Constants.TILE_DIM.y - offset.x / Constants.TILE_DIM.x);
+    return gridPos;
   },
 
-  getViewOffset: function(worldPos) {
-    return worldPos.minus(PlayState.cameraPos);
+  getViewOffset: function(gridPos) {
+    var viewOffset = new Vector2();
+    viewOffset.x = (gridPos.x - gridPos.y - 1) * (Constants.TILE_DIM.x / 2);
+    viewOffset.y = (gridPos.x + gridPos.y) * (Constants.TILE_DIM.y / 2);
+    return viewOffset.minus(PlayState.cameraPos);
   }
 });

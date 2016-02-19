@@ -1,2 +1,2 @@
-Engine.init(World);
+Engine.init(World, View);
 Engine.start();
