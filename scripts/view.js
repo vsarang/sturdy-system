@@ -20,7 +20,7 @@ var View = {
     } else {
       View.context.drawImage(sprite,
           version * dim.x, 0, dim.x, dim.y,
-          offset.x, offset.y, dim.x, dim.y);
+          offset.x - dim.x / 2, offset.y, dim.x, dim.y);
     }
   },
 
@@ -28,7 +28,6 @@ var View = {
     View.context.strokeStyle = color;
     View.context.beginPath();
     View.context.rect(offset.x, offset.y, dim.x, dim.y);
-    View.context.closePath();
     View.context.stroke();
   },
 
@@ -36,7 +35,18 @@ var View = {
     View.context.strokeStyle = color;
     View.context.beginPath();
     View.context.arc(offset.x, offset.y, radius, 0, 2 * Math.PI);
-    View.context.closePath();
+    View.context.stroke();
+  },
+
+  renderPath(path, color) {
+    View.context.strokeStyle = color;
+    View.context.beginPath();
+
+    View.context.moveTo(path[0].x, path[0].y);
+    for (var i = 1; i < path.length; i++) {
+      View.context.lineTo(path[i].x, path[i].y);
+    }
+
     View.context.stroke();
   },
 

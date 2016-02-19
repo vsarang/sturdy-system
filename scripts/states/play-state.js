@@ -4,7 +4,7 @@ var PlayState = new GameState({
     PlayState.prevDragPos = undefined;
     PlayState.selectedMinions = [];
     PlayState.collisionTree =
-      new CollisionTree(new Vector2(0, 0), engine.world.dim.times(Constants.TILE_SIZE), 5, 50);
+      new CollisionTree(new Vector2(0, 0), engine.world.dim, 5, 50);
   },
 
   start: function() {
@@ -19,18 +19,24 @@ var PlayState = new GameState({
     PlayState.updateWorld(engine.world, dt);
   },
 
+  updateWorld: function(world, dt) {
+    PlayState.updateCollisionTree(world);
+    PlayState.moveMinions(world, dt);
+    PlayState.respondToCollisions(world);
+  },
+
+  render: function(engine) {
+    PlayState.renderWorld(engine.world, engine.view);
+    PlayState.renderMinions(engine.world, engine.view);
+    PlayState.renderOverlay(engine.view);
+  },
+
   updateCollisionTree: function(world) {
     var tree = PlayState.collisionTree;
-    tree.removeLayer();
+    tree.reset();
     world.minions.forEach(function(minion) {
       tree.addObject(minion);
     });
-  },
-
-  updateWorld: function(world, dt) {
-    //PlayState.updateCollisionTree(world);
-    //PlayState.moveMinions(world, dt);
-    //PlayState.respondToCollisions(world);
   },
 
   moveMinions: function(world, dt) {
@@ -70,54 +76,48 @@ var PlayState = new GameState({
     });
   },
 
-  render: function(engine) {
-    PlayState.renderWorld(engine);
-    //PlayState.renderMinions(engine);
-    //PlayState.renderOverlay(engine);
-  },
-
-  renderWorld: function(engine) {
+  renderWorld: function(world, view) {
     var xMin = PlayState.getGridPos(new Vector2(0, 0)).x;
-    var xMax = PlayState.getGridPos(new Vector2(engine.view.dim)).x + 1;
-    var yMin = PlayState.getGridPos(new Vector2(engine.view.dim.x, 0)).y;
-    var yMax = PlayState.getGridPos(new Vector2(0, engine.view.dim.y)).y + 1;
+    var xMax = PlayState.getGridPos(new Vector2(view.dim)).x + 1;
+    var yMin = PlayState.getGridPos(new Vector2(view.dim.x, 0)).y;
+    var yMax = PlayState.getGridPos(new Vector2(0, view.dim.y)).y + 1;
 
-    var worldDim = engine.world.dim;
     var gridBounds = [
       new Vector2(Math.max(0, xMin), Math.max(0, yMin)),
-      new Vector2(Math.min(worldDim.x - 1, xMax), Math.min(worldDim.y - 1, yMax))
+      new Vector2(Math.min(world.dim.x - 1, xMax), Math.min(world.dim.y - 1, yMax))
     ];
 
     for (var j = gridBounds[0].y; j < gridBounds[1].y; j++) {
       for (var i = gridBounds[0].x; i < gridBounds[1].x; i++) {
         AssetFactory.loadSprite('images/plains_tiles.png', function(tile) {
           var gridPos = new Vector2(i, j);
-          engine.view.renderSprite(tile, PlayState.getViewOffset(gridPos),
-              Constants.TILE_DIM, engine.world.grid[i][j].version);
+          view.renderSprite(tile, PlayState.getViewOffset(gridPos),
+              Constants.TILE_DIM, world.grid[i][j].version);
         });
       }
     }
   },
 
-  renderMinions: function(world) {
-    PlayState.selectedMinions.forEach(function(minion) {
-      View.renderCircle(minion.pos.plus(minion.dim.times(1/2)).minus(PlayState.cameraPos),
-        Math.max(minion.dim.x, minion.dim.y) * 1.5, '#aaaaaa');
-    });
-
+  renderMinions: function(world, view) {
     world.minions.forEach(function(minion) {
       AssetFactory.loadSprite('images/minion.png', function(sprite) {
-        View.renderSprite(sprite, minion.pos.minus(PlayState.cameraPos));
+        view.renderSprite(sprite, PlayState.getViewOffset(minion.pos));
       });
     });
   },
 
-  renderOverlay: function() {
-    if (PlayState.boundingRect.startPos) {
-      View.renderRectangle(
-        PlayState.getViewOffset(PlayState.boundingRect.startPos),
-        PlayState.boundingRect.mousePos.minus(PlayState.boundingRect.startPos),
-        '#ffffff');
+  renderOverlay: function(view) {
+    if (PlayState.boundingRect.mousePos) {
+      var start = PlayState.boundingRect.startPos;
+      var dim = PlayState.boundingRect.mousePos.minus(start);
+      var path = [
+        start,
+        start.plus(new Vector2(dim.x, 0)),
+        start.plus(dim),
+        start.plus(new Vector2(0, dim.y)),
+        start
+      ];
+      view.renderPath(path, '#ffffff');
     }
   },
 
@@ -125,7 +125,7 @@ var PlayState = new GameState({
     switch (message.button) {
       case 0:
         // set start point for unit select rectangle
-        PlayState.boundingRect.init(PlayState.getWorldPos(message.offset));
+        PlayState.boundingRect.init(message.offset);
         break;
       case 1:
         // start dragging camera
@@ -133,7 +133,7 @@ var PlayState = new GameState({
         break;
       case 2:
         // add task to selected minions
-        PlayState.addTask(engine.world, PlayState.getWorldPos(message.offset));
+        PlayState.addTask(engine.world, PlayState.getGridPos(message.offset, true));
         break;
       default:
     }
@@ -143,7 +143,7 @@ var PlayState = new GameState({
     switch (message.button) {
       case 0:
         // select units
-        //PlayState.selectUnitsInBoundingRect(engine.world);
+        PlayState.selectUnitsInBoundingRect(engine.world);
         break;
       case 1:
         // stop dragging camera
@@ -157,7 +157,7 @@ var PlayState = new GameState({
     switch(message.button) {
       case 0:
         if (PlayState.boundingRect.startPos) {
-          PlayState.boundingRect.mousePos = PlayState.getWorldPos(message.offset);
+          PlayState.boundingRect.mousePos = message.offset;
         }
         break;
       case 1:
@@ -200,25 +200,30 @@ var PlayState = new GameState({
 
     PlayState.selectedMinions = [];
     world.minions.forEach(function(minion) {
-      if (start.x <= minion.pos.x && minion.pos.x <= end.x
-        && start.y <= minion.pos.y && minion.pos.y <= end.y) {
+      var viewPos = PlayState.getViewOffset(minion.pos);
+      if (start.x <= viewPos.x && viewPos.x <= end.x
+        && start.y <= viewPos.y && viewPos.y <= end.y) {
         PlayState.selectedMinions.push(minion);
       }
     });
     PlayState.boundingRect.destroy();
   },
 
-  getGridPos: function(offset) {
+  getGridPos: function(offset, cont) {
     offset = offset.plus(PlayState.cameraPos);
     var gridPos = new Vector2();
-    gridPos.x = Math.floor(offset.x / Constants.TILE_DIM.x + offset.y / Constants.TILE_DIM.y);
-    gridPos.y = Math.floor(offset.y / Constants.TILE_DIM.y - offset.x / Constants.TILE_DIM.x);
+    gridPos.x = offset.x / Constants.TILE_DIM.x + offset.y / Constants.TILE_DIM.y;
+    gridPos.y = offset.y / Constants.TILE_DIM.y - offset.x / Constants.TILE_DIM.x;
+    if (!cont) {
+      gridPos.x = Math.floor(gridPos.x);
+      gridPos.y = Math.floor(gridPos.y);
+    }
     return gridPos;
   },
 
   getViewOffset: function(gridPos) {
     var viewOffset = new Vector2();
-    viewOffset.x = (gridPos.x - gridPos.y - 1) * (Constants.TILE_DIM.x / 2);
+    viewOffset.x = (gridPos.x - gridPos.y) * (Constants.TILE_DIM.x / 2);
     viewOffset.y = (gridPos.x + gridPos.y) * (Constants.TILE_DIM.y / 2);
     return viewOffset.minus(PlayState.cameraPos);
   }
