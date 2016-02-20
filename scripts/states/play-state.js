@@ -1,6 +1,6 @@
 var PlayState = new GameState({
   init: function(engine) {
-    PlayState.cameraPos = new Vector2(0, 0);
+    PlayState.cameraPos = new Vector2(engine.view.canvas.width / -2, 300);
     PlayState.prevDragPos = undefined;
     PlayState.selectedMinions = [];
     PlayState.collisionTree =
@@ -20,14 +20,30 @@ var PlayState = new GameState({
   },
 
   updateWorld: function(world, dt) {
-    PlayState.updateCollisionTree(world);
+    world.minions.forEach(function(minion) {
+      world.removeEntityFromGrid(minion);
+    });
     PlayState.moveMinions(world, dt);
+    PlayState.updateCollisionTree(world);
     PlayState.respondToCollisions(world);
+    world.minions.forEach(function(minion) {
+      world.addEntityToGrid(minion);
+    });
   },
 
   render: function(engine) {
-    PlayState.renderWorld(engine.world, engine.view);
-    PlayState.renderMinions(engine.world, engine.view);
+    var xMin = PlayState.getGridPos(new Vector2(0, 0)).x;
+    var xMax = PlayState.getGridPos(new Vector2(engine.view.dim)).x + 1;
+    var yMin = PlayState.getGridPos(new Vector2(engine.view.dim.x, 0)).y;
+    var yMax = PlayState.getGridPos(new Vector2(0, engine.view.dim.y)).y + 1;
+
+    var gridBounds = [
+      new Vector2(Math.max(0, xMin), Math.max(0, yMin)),
+      new Vector2(Math.min(engine.world.dim.x - 1, xMax), Math.min(engine.world.dim.y - 1, yMax))
+    ];
+
+    PlayState.renderWorld(engine.world, engine.view, gridBounds);
+    PlayState.renderEntities(engine.world, engine.view, gridBounds);
     PlayState.renderOverlay(engine.view);
   },
 
@@ -37,6 +53,13 @@ var PlayState = new GameState({
     world.minions.forEach(function(minion) {
       tree.addObject(minion);
     });
+    for (var i = 0; i < world.grid.length; i++) {
+      for (var j = 0; j < world.grid[0].length; j++) {
+        world.grid[i][j].entities.forEach(function(entity) {
+          tree.addObject(entity);
+        });
+      }
+    }
   },
 
   moveMinions: function(world, dt) {
@@ -76,34 +99,39 @@ var PlayState = new GameState({
     });
   },
 
-  renderWorld: function(world, view) {
-    var xMin = PlayState.getGridPos(new Vector2(0, 0)).x;
-    var xMax = PlayState.getGridPos(new Vector2(view.dim)).x + 1;
-    var yMin = PlayState.getGridPos(new Vector2(view.dim.x, 0)).y;
-    var yMax = PlayState.getGridPos(new Vector2(0, view.dim.y)).y + 1;
-
-    var gridBounds = [
-      new Vector2(Math.max(0, xMin), Math.max(0, yMin)),
-      new Vector2(Math.min(world.dim.x - 1, xMax), Math.min(world.dim.y - 1, yMax))
-    ];
-
+  renderWorld: function(world, view, gridBounds) {
     for (var j = gridBounds[0].y; j < gridBounds[1].y; j++) {
       for (var i = gridBounds[0].x; i < gridBounds[1].x; i++) {
-        AssetFactory.loadSprite('images/plains_tiles.png', function(tile) {
+        AssetFactory.loadSprite('images/plains_tiles.png', function(sprite) {
           var gridPos = new Vector2(i, j);
-          view.renderSprite(tile, PlayState.getViewOffset(gridPos),
+          view.renderSprite(sprite, PlayState.getViewOffset(gridPos),
               Constants.TILE_DIM, world.grid[i][j].version);
         });
       }
     }
   },
 
-  renderMinions: function(world, view) {
-    world.minions.forEach(function(minion) {
-      AssetFactory.loadSprite('images/minion.png', function(sprite) {
-        view.renderSprite(sprite, PlayState.getViewOffset(minion.pos));
-      });
-    });
+  renderEntities: function(world, view, gridBounds) {
+    for (var j = gridBounds[0].y; j < gridBounds[1].y; j++) {
+      for (var i = gridBounds[0].x; i < gridBounds[1].x; i++) {
+        world.grid[i][j].entities.forEach(function(entity) {
+          switch (entity.type) {
+            case Constants.EntityTypes.TREE:
+              AssetFactory.loadSprite('images/tree_devs.png', function(sprite) {
+                view.renderSprite(sprite, PlayState.getViewOffset(entity.pos).plus(new Vector2(0, -25)),
+                    new Vector2(32, 32), entity.version);
+              });
+              break;
+            case Constants.EntityTypes.ACTOR:
+              AssetFactory.loadSprite('images/minion.png', function(sprite) {
+                view.renderSprite(sprite, PlayState.getViewOffset(entity.pos));
+              });
+              break;
+            default:
+          }
+        });
+      }
+    }
   },
 
   renderOverlay: function(view) {
